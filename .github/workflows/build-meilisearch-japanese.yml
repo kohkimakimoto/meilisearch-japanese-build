@@ -1,14 +1,18 @@
-name: Publish binaries to GitHub release
+name: build-meilisearch-japanese
 
 on:
   workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
 
 jobs:
   # This job is based on the official MeiliSearch GitHub Actions workflow
   # https://github.com/meilisearch/meilisearch/blob/main/.github/workflows/publish-binaries.yml
   # but it is modified to build for Japanese search.
   build-linux:
-    name: Build and publish binary for Linux
     runs-on: ubuntu-latest
     container:
       # Use ubuntu-22.04 to compile with glibc 2.35
@@ -17,19 +21,23 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install needed dependencies
         run: |
-          apt-get update && apt-get install -y curl
+          apt-get update && apt-get install -y curl git
           apt-get install build-essential -y
       - uses: dtolnay/rust-toolchain@1.85
-      - name: Checkout meilisearch repository
+      - name: Build meilisearch
+        # Build options for Japanese search
+        # see also:
+        # * https://github.com/meilisearch/meilisearch/blob/japanese-docker-image/Dockerfile
+        # * https://github.com/meilisearch/meilisearch/pull/3882
         run: |
           git clone https://github.com/meilisearch/meilisearch
           cd meilisearch
           git checkout $GITHUB_REF_NAME
-      - name: Build
-        # Build options for Japanese search
-        # see also: 
-        # * https://github.com/meilisearch/meilisearch/blob/japanese-docker-image/Dockerfile
-        # * https://github.com/meilisearch/meilisearch/pull/3882
-        run: |
-          cargo build --release -p meilisearch -p meilitool --no-default-features --features "mini-dashboard japanese"
-
+          cargo build --release --locked --no-default-features --features "mini-dashboard japanese"
+      - name: Upload meilisearch binary to release
+        if: github.event_name == 'release'
+        uses: svenstaro/upload-release-action@v2
+        with:
+          file: meilisearch/target/release/meilisearch
+          asset_name: meilisearch-linux-amd64
+          tag: ${{ github.ref }}
