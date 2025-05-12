@@ -1,0 +1,35 @@
+name: Publish binaries to GitHub release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  # This job is based on the official MeiliSearch GitHub Actions workflow
+  # https://github.com/meilisearch/meilisearch/blob/main/.github/workflows/publish-binaries.yml
+  # but it is modified to build for Japanese search.
+  build-linux:
+    name: Build and publish binary for Linux
+    runs-on: ubuntu-latest
+    container:
+      # Use ubuntu-22.04 to compile with glibc 2.35
+      image: ubuntu:22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install needed dependencies
+        run: |
+          apt-get update && apt-get install -y curl
+          apt-get install build-essential -y
+      - uses: dtolnay/rust-toolchain@1.85
+      - name: Checkout meilisearch repository
+        run: |
+          git clone https://github.com/meilisearch/meilisearch
+          cd meilisearch
+          git checkout $GITHUB_REF_NAME
+      - name: Build
+        # Build options for Japanese search
+        # see also: 
+        # * https://github.com/meilisearch/meilisearch/blob/japanese-docker-image/Dockerfile
+        # * https://github.com/meilisearch/meilisearch/pull/3882
+        run: |
+          cargo build --release -p meilisearch -p meilitool --no-default-features --features "mini-dashboard japanese"
+
